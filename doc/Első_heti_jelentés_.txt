@@ -13,7 +13,7 @@ A csapat az óra után összejött és megbeszéltük az alakulási paraméterek
 
     Megismerkedtünk egymással.
     Kiválasztottuk a témát a listából, végül a D&D pályaszerkesztő mellett döntöttünk.
-    Megbeszéltünk, hogy melyik programnyelvvel dolgozunk, a python backend mellett voksolt a csapat, és talán lesz webes frontend is.
+    Megbeszéltük, hogy melyik programnyelvvel dolgozunk, a python backend mellett voksolt a csapat, és talán lesz webes frontend is.
     Megválasztottuk a csapatkapitányt.
 
 A chat ablakban folytattuk a megbeszélést a tervek felől
