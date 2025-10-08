@@ -4,10 +4,10 @@ A csapat eddigi munkájának eredményei:
     A csapat projekt témája: D&D pálya szerkesztő
     Választott programnyelv: Python
     Választott csapatkapitány: Dinnyés Balázs
-    Elkészítettük az UML diagrammokat:
-    Dinnyés Balázs : USE - Case diagramm
-    Erős Bálint : Class - diagramm
-    Kiss Mihály : Package - diagramm
+    Elkészítettük az UML diagramokat:
+    Dinnyés Balázs : USE - Case diagram
+    Erős Bálint : Class - diagram
+    Kiss Mihály : Package - diagram
 
 A csapat az óra után összejött és megbeszéltük az alakulási paramétereket.
 
