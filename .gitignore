@@ -1,1 +1,4 @@
 *.pdf
+
+/src/frontend/node_modules
+.github/copilot-instructions.md
