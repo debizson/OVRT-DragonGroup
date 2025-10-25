@@ -1,4 +1,5 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
+import TextDialog from './TextDialog';
 
 interface CellData {
   type: string;
@@ -17,8 +18,62 @@ interface GridCanvasProps {
 export default function GridCanvas({ gridSize, zoom, selectedTool, cells, setCells }: GridCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cellSize = 32;
+  const [showTextDialog, setShowTextDialog] = useState(false);
+  const [textPosition, setTextPosition] = useState<{ x: number; y: number } | null>(null);
+  const texturesRef = useRef<Map<string, HTMLImageElement>>(new Map());
+  const [texturesLoaded, setTexturesLoaded] = useState(false);
+
+  useEffect(() => {
+    const texturesToLoad: Record<string, string> = {
+      'wall': '/src/assets/dungeon/wall/stone_brick_1.png',
+      'stone-wall': '/src/assets/dungeon/wall/stone_gray_0.png',
+      'wood-wall': '/src/assets/wood wall 1.png',
+      'floor': '/src/assets/grass1.png',
+      'stone-floor': '/src/assets/dungeon/floor/grey_dirt_0_new.png',
+      'wood-floor': '/src/assets/wood floor 1.png',
+      'door': '/src/assets/dungeon/doors/closed_door.png',
+      'water': '/src/assets/dungeon/water/deep_water.png',
+      'dirt': '/src/assets/dirt 1.png',
+      'window': '/src/assets/dungeon/wall/stone_gray_1.png',
+      'stairs': '/src/assets/dungeon/floor/limestone_0.png',
+      'chest': '/src/assets/dungeon/chest.png',
+      'torch': '/src/assets/dungeon/wall/torches/torch_1.png',
+      'tree': '/src/assets/dungeon/trees/tree_1_yellow.png',
+      'monster': '/src/assets/monster/orc_warrior_new.png',
+      'character': '/src/assets/player/base/human_male.png'
+    };
+
+    let loadedCount = 0;
+    const totalTextures = Object.keys(texturesToLoad).length;
+
+    Object.entries(texturesToLoad).forEach(([key, url]) => {
+      const img = new Image();
+      img.onload = () => {
+        texturesRef.current.set(key, img);
+        loadedCount++;
+        if (loadedCount === totalTextures) {
+          setTexturesLoaded(true);
+        }
+      };
+      img.onerror = () => {
+        console.warn(`Failed to load texture: ${key} from ${url}`);
+        loadedCount++;
+        if (loadedCount === totalTextures) {
+          setTexturesLoaded(true);
+        }
+      };
+      img.src = url;
+    });
+  }, []);
 
   const drawTexture = (ctx: CanvasRenderingContext2D, type: string, x: number, y: number, size: number) => {
+    const texture = texturesRef.current.get(type);
+    
+    if (texture && texture.complete && texture.naturalWidth > 0) {
+      ctx.drawImage(texture, x, y, size, size);
+      return;
+    }
+
     switch (type) {
       case 'wall':
         const gradient = ctx.createLinearGradient(x, y, x + size, y + size);
@@ -238,12 +293,37 @@ export default function GridCanvas({ gridSize, zoom, selectedTool, cells, setCel
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    if (!texturesLoaded) {
+      ctx.fillStyle = '#666';
+      ctx.font = '14px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Textúrák betöltése...', canvas.width / 2, canvas.height / 2);
+      return;
+    }
+
     cells.forEach((cellData, key) => {
       const [x, y] = key.split(',').map(Number);
       
-      const texturedTypes = ['wall', 'floor', 'door', 'stone-wall', 'wood-wall', 'stone-floor', 'wood-floor', 'dirt', 'water', 'window', 'stairs'];
+      const texturedTypes = ['wall', 'floor', 'door', 'stone-wall', 'wood-wall', 'stone-floor', 'wood-floor', 'dirt', 'water', 'window', 'stairs', 'chest', 'torch', 'tree', 'monster', 'character'];
       if (texturedTypes.includes(cellData.type)) {
         drawTexture(ctx, cellData.type, x * scaledCellSize, y * scaledCellSize, scaledCellSize);
+      } else if (cellData.type === 'text') {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.fillRect(
+          x * scaledCellSize,
+          y * scaledCellSize,
+          scaledCellSize,
+          scaledCellSize
+        );
+        ctx.strokeStyle = '#9333ea';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(
+          x * scaledCellSize,
+          y * scaledCellSize,
+          scaledCellSize,
+          scaledCellSize
+        );
       } else {
         ctx.fillStyle = cellData.color;
         ctx.fillRect(
@@ -255,14 +335,26 @@ export default function GridCanvas({ gridSize, zoom, selectedTool, cells, setCel
       }
 
       if (cellData.icon) {
-        ctx.font = `${scaledCellSize * 0.6}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(
-          cellData.icon,
-          x * scaledCellSize + scaledCellSize / 2,
-          y * scaledCellSize + scaledCellSize / 2
-        );
+        if (cellData.type === 'text') {
+          ctx.font = `bold ${Math.min(scaledCellSize * 0.35, 14)}px Arial`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = '#000000';
+          ctx.fillText(
+            cellData.icon,
+            x * scaledCellSize + scaledCellSize / 2,
+            y * scaledCellSize + scaledCellSize / 2
+          );
+        } else {
+          ctx.font = `${scaledCellSize * 0.6}px Arial`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(
+            cellData.icon,
+            x * scaledCellSize + scaledCellSize / 2,
+            y * scaledCellSize + scaledCellSize / 2
+          );
+        }
       }
     });
 
@@ -282,7 +374,17 @@ export default function GridCanvas({ gridSize, zoom, selectedTool, cells, setCel
       ctx.lineTo(canvas.width, y * scaledCellSize);
       ctx.stroke();
     }
-  }, [gridSize, zoom, cells, cellSize]);
+  }, [gridSize, zoom, cells, cellSize, texturesLoaded]);
+
+  const handleTextConfirm = (text: string) => {
+    if (!textPosition) return;
+    
+    const key = `${textPosition.x},${textPosition.y}`;
+    const newCells = new Map(cells);
+    newCells.set(key, { type: 'text', color: '#ffffff', icon: text });
+    setCells(newCells);
+    setTextPosition(null);
+  };
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -356,6 +458,10 @@ export default function GridCanvas({ gridSize, zoom, selectedTool, cells, setCel
       case 'monster':
         newCells.set(key, { type: 'entity', color: '#fee2e2', icon: '👹' });
         break;
+      case 'text':
+        setTextPosition({ x, y });
+        setShowTextDialog(true);
+        return;
       case 'erase':
         newCells.delete(key);
         break;
@@ -367,13 +473,21 @@ export default function GridCanvas({ gridSize, zoom, selectedTool, cells, setCel
   };
 
   return (
-    <div className="inline-block bg-white rounded-lg shadow-lg overflow-hidden">
-      <canvas
-        ref={canvasRef}
-        onClick={handleCanvasClick}
-        className="cursor-crosshair"
-        style={{ imageRendering: 'crisp-edges' }}
+    <>
+      <div className="inline-block bg-white rounded-lg shadow-lg overflow-hidden">
+        <canvas
+          ref={canvasRef}
+          onClick={handleCanvasClick}
+          className="cursor-crosshair"
+          style={{ imageRendering: 'crisp-edges' }}
+        />
+      </div>
+      
+      <TextDialog
+        isOpen={showTextDialog}
+        onClose={() => setShowTextDialog(false)}
+        onConfirm={handleTextConfirm}
       />
-    </div>
+    </>
   );
 }

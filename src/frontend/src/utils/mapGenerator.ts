@@ -11,10 +11,49 @@ interface Room {
   height: number;
 }
 
-export function generateRandomMap(gridWidth: number, gridHeight: number): Map<string, CellData> {
+type Difficulty = 'easy' | 'medium' | 'hard' | 'very-hard';
+
+interface DifficultyConfig {
+  numRooms: { min: number; max: number };
+  monstersPerRoom: { min: number; max: number };
+  objectChance: number;
+  extraMonsters: number;
+}
+
+const difficultyConfigs: Record<Difficulty, DifficultyConfig> = {
+  'easy': {
+    numRooms: { min: 3, max: 4 },
+    monstersPerRoom: { min: 0, max: 1 },
+    objectChance: 0.5,
+    extraMonsters: 0
+  },
+  'medium': {
+    numRooms: { min: 5, max: 7 },
+    monstersPerRoom: { min: 1, max: 2 },
+    objectChance: 0.35,
+    extraMonsters: 2
+  },
+  'hard': {
+    numRooms: { min: 7, max: 10 },
+    monstersPerRoom: { min: 2, max: 3 },
+    objectChance: 0.25,
+    extraMonsters: 5
+  },
+  'very-hard': {
+    numRooms: { min: 10, max: 14 },
+    monstersPerRoom: { min: 3, max: 5 },
+    objectChance: 0.15,
+    extraMonsters: 8
+  }
+};
+
+export function generateRandomMap(gridWidth: number, gridHeight: number, difficulty: Difficulty = 'medium'): Map<string, CellData> {
+  console.log(`generateRandomMap called with difficulty: ${difficulty}`);
   const cells = new Map<string, CellData>();
   const rooms: Room[] = [];
-  const numRooms = Math.floor(Math.random() * 5) + 4;
+  const config = difficultyConfigs[difficulty];
+  console.log(`Config for ${difficulty}:`, config);
+  const numRooms = Math.floor(Math.random() * (config.numRooms.max - config.numRooms.min + 1)) + config.numRooms.min;
   
   for (let i = 0; i < numRooms; i++) {
     const attempts = 100;
@@ -94,7 +133,7 @@ export function generateRandomMap(gridWidth: number, gridHeight: number): Map<st
   });
   
   rooms.forEach((room) => {
-    if (Math.random() > 0.3) {
+    if (Math.random() > (1 - config.objectChance)) {
       const numObjects = Math.floor(Math.random() * 3) + 1;
       for (let i = 0; i < numObjects; i++) {
         const x = room.x + Math.floor(Math.random() * (room.width - 2)) + 1;
@@ -120,19 +159,54 @@ export function generateRandomMap(gridWidth: number, gridHeight: number): Map<st
     }
   });
   
-  const numMonsters = Math.floor(Math.random() * 3) + 1;
-  for (let i = 0; i < numMonsters; i++) {
-    const room = rooms[Math.floor(Math.random() * rooms.length)];
-    const x = room.x + Math.floor(Math.random() * (room.width - 2)) + 1;
-    const y = room.y + Math.floor(Math.random() * (room.height - 2)) + 1;
-    const key = `${x},${y}`;
+  let totalMonsters = 0;
+  rooms.forEach((room, roomIndex) => {
+    const monstersInRoom = Math.floor(Math.random() * (config.monstersPerRoom.max - config.monstersPerRoom.min + 1)) + config.monstersPerRoom.min;
+    let placedInRoom = 0;
     
-    if (cells.has(key) && cells.get(key)?.type.includes('floor')) {
-      cells.set(key, { type: 'entity', color: '#fee2e2', icon: '👹' });
+    for (let i = 0; i < monstersInRoom; i++) {
+      let attempts = 0;
+      while (attempts < 20) {
+        const x = room.x + Math.floor(Math.random() * (room.width - 2)) + 1;
+        const y = room.y + Math.floor(Math.random() * (room.height - 2)) + 1;
+        const key = `${x},${y}`;
+        
+        if (cells.has(key) && cells.get(key)?.type.includes('floor')) {
+          cells.set(key, { type: 'monster', color: '#fee2e2', icon: '👹' });
+          totalMonsters++;
+          placedInRoom++;
+          break;
+        }
+        attempts++;
+      }
+    }
+    console.log(`Szoba ${roomIndex + 1}: ${placedInRoom} szörny elhelyezve (cél: ${monstersInRoom})`);
+  });
+  
+  let extraPlaced = 0;
+  for (let i = 0; i < config.extraMonsters; i++) {
+    let attempts = 0;
+    while (attempts < 50) {
+      const room = rooms[Math.floor(Math.random() * rooms.length)];
+      const x = room.x + Math.floor(Math.random() * (room.width - 2)) + 1;
+      const y = room.y + Math.floor(Math.random() * (room.height - 2)) + 1;
+      const key = `${x},${y}`;
+      
+      if (cells.has(key) && cells.get(key)?.type.includes('floor')) {
+        cells.set(key, { type: 'monster', color: '#fee2e2', icon: '👹' });
+        totalMonsters++;
+        extraPlaced++;
+        break;
+      }
+      attempts++;
     }
   }
   
-  console.log(`Térkép generálva: ${rooms.length} szoba, ${cells.size} cella`);
+  console.log(`Extra szörnyek: ${extraPlaced} / ${config.extraMonsters}`);
+  console.log(`=== TÉRKÉP GENERÁLVA (${difficulty.toUpperCase()}) ===`);
+  console.log(`Nehézség konfig:`, config);
+  console.log(`Eredmény: ${rooms.length} szoba, ${totalMonsters} szörny, ${cells.size} cella`);
+  console.log(`=======================================`);
   return cells;
 }
 

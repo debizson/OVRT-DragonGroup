@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { Save, Undo, Redo, Download, Trash2, Grid3x3, ZoomIn, ZoomOut } from 'lucide-react';
 import GridCanvas from '../components/GridCanvas';
 import Toolbar from '../components/Toolbar';
@@ -15,16 +15,19 @@ interface CellData {
 
 export default function EditorPage() {
   const [searchParams] = useSearchParams();
-  const [gridSize] = useState({ width: 30, height: 20 });
+  const location = useLocation();
+  const [gridSize, setGridSize] = useState({ width: 30, height: 20 });
   const [zoom, setZoom] = useState(1);
   const [selectedTool, setSelectedTool] = useState<string>('select');
   const [cells, setCells] = useState<Map<string, CellData>>(new Map());
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [isGenerated, setIsGenerated] = useState(false);
+  const [showDimensionDialog, setShowDimensionDialog] = useState(false);
+  const [generatedDifficulty, setGeneratedDifficulty] = useState<'easy' | 'medium' | 'hard' | 'very-hard' | null>(null);
   
   const history = useRef<Map<string, CellData>[]>([new Map()]);
   const historyIndex = useRef(0);
+  const lastGeneratedDifficulty = useRef<string | null>(null);
 
   const handleZoomIn = () => setZoom(Math.min(zoom + 0.1, 2));
   const handleZoomOut = () => setZoom(Math.max(zoom - 0.1, 0.5));
@@ -77,13 +80,58 @@ export default function EditorPage() {
 
   useEffect(() => {
     const mode = searchParams.get('mode');
-    if (mode === 'generate' && !isGenerated) {
-      const generatedMap = generateRandomMap(gridSize.width, gridSize.height);
-      updateCellsWithHistory(generatedMap);
-      setIsGenerated(true);
-      console.log('Véletlenszerű térkép generálva!');
+    const difficultyParam = searchParams.get('difficulty') as 'easy' | 'medium' | 'hard' | 'very-hard' | null;
+    const difficulty = difficultyParam || 'medium';
+    
+    console.log('Mode:', mode, 'Difficulty param:', difficultyParam, 'Final difficulty:', difficulty);
+    console.log('Last generated difficulty:', lastGeneratedDifficulty.current);
+    
+    if (mode === 'generate') {
+      if (lastGeneratedDifficulty.current !== difficulty) {
+        console.log(`Generálás előtt - difficulty: ${difficulty}, lastGenerated: ${lastGeneratedDifficulty.current}`);
+        const generatedMap = generateRandomMap(gridSize.width, gridSize.height, difficulty);
+        updateCellsWithHistory(generatedMap);
+        lastGeneratedDifficulty.current = difficulty;
+        setGeneratedDifficulty(difficulty);
+        console.log(`Véletlenszerű térkép generálva (${difficulty})!`);
+      } else {
+        console.log(`Már létezik ${difficulty} nehézségű térkép, nem generálunk újat`);
+      }
+    } else {
+      lastGeneratedDifficulty.current = null;
+      setGeneratedDifficulty(null);
     }
-  }, [searchParams, isGenerated, gridSize, updateCellsWithHistory]);
+  }, [searchParams, gridSize, updateCellsWithHistory]);
+
+  useEffect(() => {
+    const loadedMap = (location.state as any)?.loadedMap;
+    if (loadedMap) {
+      try {
+        if (loadedMap.gridSize) {
+          setGridSize(loadedMap.gridSize);
+        }
+        if (loadedMap.zoom) {
+          setZoom(loadedMap.zoom);
+        }
+        if (loadedMap.cells && Array.isArray(loadedMap.cells)) {
+          const newCells = new Map<string, CellData>();
+          loadedMap.cells.forEach((cell: any) => {
+            const key = `${cell.x},${cell.y}`;
+            newCells.set(key, {
+              type: cell.type,
+              color: cell.color,
+              icon: cell.icon
+            });
+          });
+          updateCellsWithHistory(newCells);
+          console.log('Térkép betöltve:', loadedMap.cellCount || newCells.size, 'cella');
+        }
+      } catch (error) {
+        console.error('Hiba a térkép betöltésekor:', error);
+        alert('Hiba történt a térkép betöltése közben!');
+      }
+    }
+  }, [location.state, updateCellsWithHistory]);
 
   const canUndo = historyIndex.current > 0;
   const canRedo = historyIndex.current < history.current.length - 1;
@@ -104,7 +152,19 @@ export default function EditorPage() {
       cellCount: cells.size
     };
     
-    console.log('Térkép mentése:', mapData);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const fileName = `dnd-map-${timestamp}`;
+    
+    const jsonString = JSON.stringify(mapData, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${fileName}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    
+    console.log('Térkép mentve:', fileName);
     console.log('Összesen cellák:', cells.size);
   };
 
@@ -157,9 +217,16 @@ export default function EditorPage() {
     }
   };
 
+  const handleUpdateDimensions = (newWidth: number, newHeight: number) => {
+    setGridSize({ width: newWidth, height: newHeight });
+    setShowDimensionDialog(false);
+    console.log(`Rács mérete frissítve: ${newWidth} × ${newHeight}`);
+  };
+
   const handleDeleteMap = () => {
     const newCells = new Map<string, CellData>();
     updateCellsWithHistory(newCells);
+    setGeneratedDifficulty(null);
     setShowDeleteConfirm(false);
     console.log('Térkép törölve - összes cella eltávolítva');
   };
@@ -206,12 +273,16 @@ export default function EditorPage() {
         </div>
 
         <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
+          <button 
+            onClick={() => setShowDimensionDialog(true)}
+            className="flex items-center space-x-2 hover:bg-gray-100 rounded-lg px-3 py-1 transition-colors"
+            title="Rács méretének módosítása"
+          >
             <Grid3x3 className="w-5 h-5 text-gray-600" />
             <span className="text-sm text-gray-600">
               {gridSize.width} × {gridSize.height}
             </span>
-          </div>
+          </button>
           <div className="flex items-center space-x-2 bg-gray-100 rounded-lg px-3 py-1">
             <button onClick={handleZoomOut} className="p-1 hover:bg-gray-200 rounded">
               <ZoomOut className="w-4 h-4" />
@@ -239,7 +310,13 @@ export default function EditorPage() {
           />
         </div>
 
-        <PropertiesPanel />
+        <PropertiesPanel 
+          gridSize={gridSize}
+          onGridSizeChange={handleUpdateDimensions}
+          cellCount={cells.size}
+          cells={cells}
+          generatedDifficulty={generatedDifficulty}
+        />
       </div>
 
       <ExportDialog 
@@ -280,6 +357,106 @@ export default function EditorPage() {
           </div>
         </div>
       )}
+
+      {showDimensionDialog && (
+        <DimensionDialog
+          currentWidth={gridSize.width}
+          currentHeight={gridSize.height}
+          onClose={() => setShowDimensionDialog(false)}
+          onUpdate={handleUpdateDimensions}
+        />
+      )}
+    </div>
+  );
+}
+
+interface DimensionDialogProps {
+  currentWidth: number;
+  currentHeight: number;
+  onClose: () => void;
+  onUpdate: (width: number, height: number) => void;
+}
+
+function DimensionDialog({ currentWidth, currentHeight, onClose, onUpdate }: DimensionDialogProps) {
+  const [width, setWidth] = useState(currentWidth);
+  const [height, setHeight] = useState(currentHeight);
+
+  const handleSubmit = () => {
+    if (width >= 10 && width <= 100 && height >= 10 && height <= 100) {
+      onUpdate(width, height);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+        <div className="p-6">
+          <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-purple-100 rounded-full">
+            <Grid3x3 className="w-6 h-6 text-purple-600" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+            Rács méretének módosítása
+          </h3>
+          <p className="text-sm text-gray-600 text-center mb-6">
+            Állítsd be a térkép szélességét és magasságát (10-100 között)
+          </p>
+
+          <div className="space-y-4 mb-6">
+            <div>
+              <label htmlFor="width" className="block text-sm font-medium text-gray-700 mb-2">
+                Szélesség: {width}
+              </label>
+              <input
+                id="width"
+                type="range"
+                min="10"
+                max="100"
+                value={width}
+                onChange={(e) => setWidth(Number(e.target.value))}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>10</span>
+                <span>100</span>
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="height" className="block text-sm font-medium text-gray-700 mb-2">
+                Magasság: {height}
+              </label>
+              <input
+                id="height"
+                type="range"
+                min="10"
+                max="100"
+                value={height}
+                onChange={(e) => setHeight(Number(e.target.value))}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>10</span>
+                <span>100</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            >
+              Mégse
+            </button>
+            <button
+              onClick={handleSubmit}
+              className="flex-1 px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+            >
+              Alkalmazás
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
