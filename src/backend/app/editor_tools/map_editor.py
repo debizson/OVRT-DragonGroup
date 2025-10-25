@@ -111,19 +111,19 @@ class EmptyDataSaver(DBHandlerAbstract):
             alap_dokumentum = {
                 "gridSize": {
                     "width": 30,
-                    "height": 20,
-                    "zoom": 1
+                    "height": 20
                 },
+                "zoom": 1,
                 "cells": [
                     {
-                        "x": 0,
-                        "y": 0,
+                        "x": 1,
+                        "y": 1,
                         "type": "wall",
                         "color": "#6b7280",
-                        "icon": "",
-                        "timestamp": "2025-10-25T12:49:17.516Z"
+                        "icon": ""
                     }
                 ],
+                "timestamp": "2025-10-25T13:25:51.522Z",
                 "cellCount": 1
             }
 
