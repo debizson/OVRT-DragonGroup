@@ -107,13 +107,26 @@ class EmptyDataSaver(DBHandlerAbstract):
         self.logolas(f"Üres mentés kollekcióba: {kollekcio_nev}")
         try:
             collection = db[kollekcio_nev]
+           
             alap_dokumentum = {
-                "x": 1,
-                "y": 1,
-                "type": "wall",
-                "color": "#6b7280",
-                "icon": " "
+                "gridSize": {
+                    "width": 30,
+                    "height": 20,
+                    "zoom": 1
+                },
+                "cells": [
+                    {
+                        "x": 0,
+                        "y": 0,
+                        "type": "wall",
+                        "color": "#6b7280",
+                        "icon": "",
+                        "timestamp": "2025-10-25T12:49:17.516Z"
+                    }
+                ],
+                "cellCount": 1
             }
+
             collection.insert_one(alap_dokumentum)
             return True
         except Exception as e:
