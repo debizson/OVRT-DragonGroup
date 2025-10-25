@@ -1,14 +1,21 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect } from 'react';
+
+interface CellData {
+  type: string;
+  color: string;
+  icon: string;
+}
 
 interface GridCanvasProps {
   gridSize: { width: number; height: number };
   zoom: number;
   selectedTool: string;
+  cells: Map<string, CellData>;
+  setCells: (cells: Map<string, CellData>) => void;
 }
 
-export default function GridCanvas({ gridSize, zoom, selectedTool }: GridCanvasProps) {
+export default function GridCanvas({ gridSize, zoom, selectedTool, cells, setCells }: GridCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [cells, setCells] = useState<Map<string, CellData>>(new Map());
   const cellSize = 32;
 
   const drawTexture = (ctx: CanvasRenderingContext2D, type: string, x: number, y: number, size: number) => {
@@ -369,10 +376,4 @@ export default function GridCanvas({ gridSize, zoom, selectedTool }: GridCanvasP
       />
     </div>
   );
-}
-
-interface CellData {
-  type: string;
-  color: string;
-  icon: string;
 }
