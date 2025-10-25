@@ -1,7 +1,7 @@
 # Absztrakt osztály az adatbázis kapcsolathoz
 # Factory method pattern
 from abc import ABC, abstractmethod
-from database.db import db  # Itt használjuk a db.py fájlt
+from db import db  # Itt használjuk a db.py fájlt
 
 class DatabaseOperation(ABC):
     def __init__(self):
@@ -10,4 +10,3 @@ class DatabaseOperation(ABC):
     @abstractmethod
     def execute(self, *args, **kwargs):
         pass
-``
