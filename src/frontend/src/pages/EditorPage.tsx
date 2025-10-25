@@ -1,9 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Save, Undo, Redo, Download, Trash2, Grid3x3, ZoomIn, ZoomOut } from 'lucide-react';
 import GridCanvas from '../components/GridCanvas';
 import Toolbar from '../components/Toolbar';
 import PropertiesPanel from '../components/PropertiesPanel';
 import ExportDialog from '../components/ExportDialog';
+import { generateRandomMap } from '../utils/mapGenerator';
 
 interface CellData {
   type: string;
@@ -12,12 +14,14 @@ interface CellData {
 }
 
 export default function EditorPage() {
+  const [searchParams] = useSearchParams();
   const [gridSize] = useState({ width: 30, height: 20 });
   const [zoom, setZoom] = useState(1);
   const [selectedTool, setSelectedTool] = useState<string>('select');
   const [cells, setCells] = useState<Map<string, CellData>>(new Map());
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isGenerated, setIsGenerated] = useState(false);
   
   const history = useRef<Map<string, CellData>[]>([new Map()]);
   const historyIndex = useRef(0);
@@ -70,6 +74,16 @@ export default function EditorPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleUndo, handleRedo]);
+
+  useEffect(() => {
+    const mode = searchParams.get('mode');
+    if (mode === 'generate' && !isGenerated) {
+      const generatedMap = generateRandomMap(gridSize.width, gridSize.height);
+      updateCellsWithHistory(generatedMap);
+      setIsGenerated(true);
+      console.log('Véletlenszerű térkép generálva!');
+    }
+  }, [searchParams, isGenerated, gridSize, updateCellsWithHistory]);
 
   const canUndo = historyIndex.current > 0;
   const canRedo = historyIndex.current < history.current.length - 1;
