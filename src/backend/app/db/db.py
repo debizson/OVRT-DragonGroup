@@ -130,20 +130,6 @@ class RealDataSaver(DBHandlerAbstract):
             return False
 
 
-# --- Dokumentum listázó ---
-
-class DocumentLister:
-    def __init__(self):
-        pass
-
-    def list_documents(self) -> list[dict]:
-        try:
-            collection = db["maps"]
-            dokumentumok = list(collection.find({}, {"_id": 0}))
-            return dokumentumok
-        except Exception as e:
-            print(f"Hiba a dokumentumok listázása során: {e}")
-            return []
         
 class DocumentDeleter:
     def __init__(self):
