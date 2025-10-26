@@ -1,6 +1,24 @@
 import { useRef, useEffect, useState } from 'react';
 import TextDialog from './TextDialog';
 
+// Import textures
+import wallTexture from '../assets/dungeon/wall/stone_brick_1.png';
+import stoneWallTexture from '../assets/dungeon/wall/stone_gray_0.png';
+import woodWallTexture from '../assets/wood wall 1.png';
+import floorTexture from '../assets/grass1.png';
+import stoneFloorTexture from '../assets/dungeon/floor/grey_dirt_0_new.png';
+import woodFloorTexture from '../assets/wood floor 1.png';
+import doorTexture from '../assets/dungeon/doors/closed_door.png';
+import waterTexture from '../assets/dungeon/water/deep_water.png';
+import dirtTexture from '../assets/dirt 1.png';
+import windowTexture from '../assets/window.png';
+import stairsTexture from '../assets/dungeon/gateways/stone_stairs_up.png';
+import chestTexture from '../assets/dungeon/chest.png';
+import torchTexture from '../assets/dungeon/wall/torches/torch_1.png';
+import treeTexture from '../assets/dungeon/trees/tree_1_yellow.png';
+import monsterTexture from '../assets/monster/orc_warrior_new.png';
+import characterTexture from '../assets/player/base/human_male.png';
+
 interface CellData {
   type: string;
   color: string;
@@ -25,22 +43,22 @@ export default function GridCanvas({ gridSize, zoom, selectedTool, cells, setCel
 
   useEffect(() => {
     const texturesToLoad: Record<string, string> = {
-      'wall': '/src/assets/dungeon/wall/stone_brick_1.png',
-      'stone-wall': '/src/assets/dungeon/wall/stone_gray_0.png',
-      'wood-wall': '/src/assets/wood wall 1.png',
-      'floor': '/src/assets/grass1.png',
-      'stone-floor': '/src/assets/dungeon/floor/grey_dirt_0_new.png',
-      'wood-floor': '/src/assets/wood floor 1.png',
-      'door': '/src/assets/dungeon/doors/closed_door.png',
-      'water': '/src/assets/dungeon/water/deep_water.png',
-      'dirt': '/src/assets/dirt 1.png',
-      'window': '/src/assets/dungeon/wall/stone_gray_1.png',
-      'stairs': '/src/assets/dungeon/floor/limestone_0.png',
-      'chest': '/src/assets/dungeon/chest.png',
-      'torch': '/src/assets/dungeon/wall/torches/torch_1.png',
-      'tree': '/src/assets/dungeon/trees/tree_1_yellow.png',
-      'monster': '/src/assets/monster/orc_warrior_new.png',
-      'character': '/src/assets/player/base/human_male.png'
+      'wall': wallTexture,
+      'stone-wall': stoneWallTexture,
+      'wood-wall': woodWallTexture,
+      'floor': floorTexture,
+      'stone-floor': stoneFloorTexture,
+      'wood-floor': woodFloorTexture,
+      'door': doorTexture,
+      'water': waterTexture,
+      'dirt': dirtTexture,
+      'window': windowTexture,
+      'stairs': stairsTexture,
+      'chest': chestTexture,
+      'torch': torchTexture,
+      'tree': treeTexture,
+      'monster': monsterTexture,
+      'character': characterTexture
     };
 
     let loadedCount = 0;
@@ -49,14 +67,16 @@ export default function GridCanvas({ gridSize, zoom, selectedTool, cells, setCel
     Object.entries(texturesToLoad).forEach(([key, url]) => {
       const img = new Image();
       img.onload = () => {
+        console.log(`Successfully loaded texture: ${key}`);
         texturesRef.current.set(key, img);
         loadedCount++;
         if (loadedCount === totalTextures) {
+          console.log('All textures loaded!');
           setTexturesLoaded(true);
         }
       };
-      img.onerror = () => {
-        console.warn(`Failed to load texture: ${key} from ${url}`);
+      img.onerror = (error) => {
+        console.error(`Failed to load texture: ${key} from ${url}`, error);
         loadedCount++;
         if (loadedCount === totalTextures) {
           setTexturesLoaded(true);
@@ -72,6 +92,13 @@ export default function GridCanvas({ gridSize, zoom, selectedTool, cells, setCel
     if (texture && texture.complete && texture.naturalWidth > 0) {
       ctx.drawImage(texture, x, y, size, size);
       return;
+    }
+    
+    // If texture failed to load, log it and use fallback
+    if (!texture) {
+      console.warn(`No texture found in map for type: ${type}, available textures:`, Array.from(texturesRef.current.keys()));
+    } else {
+      console.warn(`Texture exists but not ready for type: ${type}, complete: ${texture.complete}, naturalWidth: ${texture.naturalWidth}`);
     }
 
     switch (type) {
@@ -306,7 +333,9 @@ export default function GridCanvas({ gridSize, zoom, selectedTool, cells, setCel
       const [x, y] = key.split(',').map(Number);
       
       const texturedTypes = ['wall', 'floor', 'door', 'stone-wall', 'wood-wall', 'stone-floor', 'wood-floor', 'dirt', 'water', 'window', 'stairs', 'chest', 'torch', 'tree', 'monster', 'character'];
-      if (texturedTypes.includes(cellData.type)) {
+      const hasTexture = texturedTypes.includes(cellData.type);
+      
+      if (hasTexture) {
         drawTexture(ctx, cellData.type, x * scaledCellSize, y * scaledCellSize, scaledCellSize);
       } else if (cellData.type === 'text') {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
@@ -334,7 +363,8 @@ export default function GridCanvas({ gridSize, zoom, selectedTool, cells, setCel
         );
       }
 
-      if (cellData.icon) {
+      // Only render icon if it's text or if it doesn't have a texture
+      if (cellData.icon && !hasTexture) {
         if (cellData.type === 'text') {
           ctx.font = `bold ${Math.min(scaledCellSize * 0.35, 14)}px Arial`;
           ctx.textAlign = 'center';
@@ -435,28 +465,28 @@ export default function GridCanvas({ gridSize, zoom, selectedTool, cells, setCel
         newCells.set(key, { type: 'water', color: '#4a90e2', icon: '' });
         break;
       case 'table':
-        newCells.set(key, { type: 'furniture', color: '#fef3c7', icon: '🍽' });
+        newCells.set(key, { type: 'table', color: '#fef3c7', icon: '🍽' });
         break;
       case 'chair':
-        newCells.set(key, { type: 'furniture', color: '#fef3c7', icon: '🪑' });
+        newCells.set(key, { type: 'chair', color: '#fef3c7', icon: '🪑' });
         break;
       case 'bed':
-        newCells.set(key, { type: 'furniture', color: '#fef3c7', icon: '🛏️' });
+        newCells.set(key, { type: 'bed', color: '#fef3c7', icon: '🛏️' });
         break;
       case 'chest':
-        newCells.set(key, { type: 'furniture', color: '#fef3c7', icon: '📦' });
+        newCells.set(key, { type: 'chest', color: '#fef3c7', icon: '📦' });
         break;
       case 'torch':
-        newCells.set(key, { type: 'decoration', color: '#fff3cd', icon: '🔥' });
+        newCells.set(key, { type: 'torch', color: '#fff3cd', icon: '🔥' });
         break;
       case 'tree':
-        newCells.set(key, { type: 'decoration', color: '#e8f5e9', icon: '🌲' });
+        newCells.set(key, { type: 'tree', color: '#e8f5e9', icon: '🌲' });
         break;
       case 'character':
-        newCells.set(key, { type: 'entity', color: '#dbeafe', icon: '🧙' });
+        newCells.set(key, { type: 'character', color: '#dbeafe', icon: '🧙' });
         break;
       case 'monster':
-        newCells.set(key, { type: 'entity', color: '#fee2e2', icon: '👹' });
+        newCells.set(key, { type: 'monster', color: '#fee2e2', icon: '👹' });
         break;
       case 'text':
         setTextPosition({ x, y });
