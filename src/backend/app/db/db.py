@@ -22,8 +22,11 @@ print(f"Connected to MongoDB database: {MONGODB_DB}")
 
 
 
+
+# Feltételezzük, hogy a MongoDB kapcsolat már létrejött és a 'db' objektum elérhető
+
 # --- Factory method pattern ---
-    
+
 class DBHandlerAbstract(ABC):
     def __init__(self, forras_nev: str):
         self.forras_nev = forras_nev
@@ -36,68 +39,56 @@ class DBHandlerAbstract(ABC):
         pass
 
 
-
-
 class DbLoad(DBHandlerAbstract):
     def __init__(self):
         super().__init__("loader")
 
-    def run(self, kollekcio_nev: str, szuro: dict = {}) -> list[dict]:
-        self.logolas(f"Adatok lekérése a kollekcióból: {kollekcio_nev}")
+    def run(self, nev: str) -> list[dict]:
+        self.logolas(f"Adatok lekérése a 'maps' kollekcióból a név alapján: {nev}")
         try:
-            collection = db[kollekcio_nev]
-            dokumentumok = list(collection.find(szuro))
-            return dokumentumok
+            collection = db["maps"]
+            dokumentum = list(collection.find({"name": nev}, {"_id": 0}))
+            return dokumentum
         except Exception as e:
             print(f"Hiba a lekérés során: {e}")
             return []
-        
 
 
-       
-
-
-
-
-# Null object pattern
+# --- Null object pattern ---
 
 class SaveController:
     def __init__(self):
         pass
 
-   
     def dokumentum_ures(self, dokumentum: dict) -> bool:
-        # Akkor tekintjük üresnek, ha nincs cella, vagy minden cella 'type' mezője üres (None, "", 0 vagy hiányzik)
         cells = dokumentum.get("cells", [])
         if not cells:
-            return True  # nincs egyetlen cella sem
+            return True
         return all(
             not cell.get("type") or cell.get("type") in [None, "", 0]
             for cell in cells
         )
 
-
-
-    def run(self, kollekcio_nev: str, dokumentumok: list[dict]) -> bool:
+    def run(self, dokumentumok: list[dict]) -> bool:
         if dokumentumok and not all(self.dokumentum_ures(d) for d in dokumentumok):
             mento = RealDataSaver()
         else:
             mento = EmptyDataSaver()
 
-        return mento.run(kollekcio_nev, dokumentumok)
-    
+        return mento.run(dokumentumok)
 
 
 class EmptyDataSaver(DBHandlerAbstract):
     def __init__(self):
         super().__init__("ures_mento")
 
-    def run(self, kollekcio_nev: str, dokumentumok: list[dict]) -> bool:
-        self.logolas(f"Üres mentés kollekcióba: {kollekcio_nev}")
+    def run(self, dokumentumok: list[dict]) -> bool:
+        self.logolas("Üres mentés a 'maps' kollekcióba")
         try:
-            collection = db[kollekcio_nev]
-           
+            collection = db["maps"]
+
             alap_dokumentum = {
+                "name": "default_map",  # ✅ HOZZÁADVA: alapértelmezett név mező
                 "gridSize": {
                     "width": 30,
                     "height": 20
@@ -116,7 +107,6 @@ class EmptyDataSaver(DBHandlerAbstract):
                 "cellCount": 1
             }
 
-
             collection.insert_one(alap_dokumentum)
             return True
         except Exception as e:
@@ -128,46 +118,68 @@ class RealDataSaver(DBHandlerAbstract):
     def __init__(self):
         super().__init__("valos_mento")
 
-    def run(self, kollekcio_nev: str, dokumentumok: list[dict]) -> bool:
-        self.logolas(f"Valós mentés kollekcióba: {kollekcio_nev}")
+    def run(self, dokumentumok: list[dict]) -> bool:
+        self.logolas("Valós mentés a 'maps' kollekcióba")
         try:
-            collection = db[kollekcio_nev]
-            collection.insert_many(dokumentumok)
+            collection = db["maps"]
+            for dokumentum in dokumentumok:
+                collection.insert_one(dokumentum)  # ✅ MÓDOSÍTÁS: dokumentum mentése módosítás nélkül
             return True
         except Exception as e:
             print(f"Hiba a mentés során: {e}")
             return False
-        
 
-class CollectionLister:
+
+# --- Dokumentum listázó ---
+
+class DocumentLister:
     def __init__(self):
         pass
 
-       
-    def list_collections(self) -> list[str]:
+    def list_documents(self) -> list[dict]:
         try:
-            collections = db.list_collection_names()
-            return collections
+            collection = db["maps"]
+            dokumentumok = list(collection.find({}, {"_id": 0}))
+            return dokumentumok
         except Exception as e:
-            print(f"Hiba a kollekciók listázása során: {e}")
+            print(f"Hiba a dokumentumok listázása során: {e}")
             return []
+        
+class DocumentDeleter:
+    def __init__(self):
+        pass
 
+    def delete_by_name(self, nev: str) -> bool:
+        try:
+            collection = db["maps"]
+            eredmeny = collection.delete_many({"name": nev})  # 🔧 Törlés név alapján
+            print(f"{eredmeny.deleted_count} dokumentum törölve a 'maps' kollekcióból.")
+            return eredmeny.deleted_count > 0
+        except Exception as e:
+            print(f"Hiba a törlés során: {e}")
+            return False  
 
+class AllDocumentsFetcher:
+    def __init__(self):
+        pass
 
+    def fetch_all(self) -> list[dict]:
+        try:
+            collection = db["maps"]
+            dokumentumok = list(collection.find({}, {"_id": 0}))  # 🔍 Minden dokumentum, _id nélkül
+            return dokumentumok
+        except Exception as e:
+            print(f"Hiba a dokumentumok lekérése során: {e}")
+            return []      
 
 
 #Példa használat:
 
-# map nevek listázása, azaz a kollekcióké
-
-# lister = CollectionLister()
-# kollekciok = lister.list_collections()
-# print("Kollekciók az adatbázisban:", kollekciok)
 
 
 
-
-# document_list = {
+# document = {
+#      "name": "default_map4",  # ✅ HOZZÁADVA: alapértelmezett név mező
 #      "gridSize": {
 #          "width": 30,
 #          "height": 20
@@ -197,16 +209,25 @@ class CollectionLister:
 
 
 
-# print(document_list)
+# print(document)
 
 
 
 # controller = SaveController()
-# controller.run("map230", [document_list])
+# controller.run([document])
 
 # loader = DbLoad()
-# document_list = loader.run("map230")
+# document= loader.run("default_map")
 
-# print(document_list)
+# print(document)
+
+# deleter = DocumentDeleter()
+# deleter.delete_by_name("default_map")
+
+# fetcher = AllDocumentsFetcher()
+# osszes = fetcher.fetch_all()
+# for doc in osszes:
+#     print(doc)
+
 
 
