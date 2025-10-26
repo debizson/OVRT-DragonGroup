@@ -1,17 +1,127 @@
-from flask import Flask
-from db import db
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from app.db.db import db
+from app.analysis.difficulty import DifficultyCalculator
 
 app = Flask(__name__)
+CORS(app)
 
-@app.get("/api/health")
+maps_collection = db["maps"]
+
+@app.route("/api/health", methods=['GET'])
 def health():
-    return {"status": "ok"}
+    return jsonify({"status": "ok"})
 
-if __name__ == "__main__":
-    app.run(debug=True, port=8000)
+@app.route("/api/maps", methods=['GET'])
+def get_maps():
+    try:
+        maps_data = list(maps_collection.find({}, {"_id": 0, "name": 1, "difficulty": 1}))
+        print(f"Found {len(maps_data)} maps. Returning data.")
+        return jsonify(maps_data)
+    except Exception as e:
+        print(f"Error in /api/maps: {e}")
+        return jsonify({"error": str(e)}), 500
 
+@app.route("/api/maps/<string:map_name>", methods=['GET'])
+def get_map_by_name(map_name):
+    try:
+        result = maps_collection.find_one({"name": map_name}, {"_id": 0})
+        if result:
+            return jsonify(result)
+        else:
+            return jsonify({"error": "Map not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-    # main.py
+@app.route("/api/maps", methods=['POST'])
+def save_map():
+    try:
+        data = request.get_json()
+        if not data or 'name' not in data or 'items' not in data or 'difficulty' not in data:
+            return jsonify({"error": "Invalid data format, must include name, items, and difficulty"}), 400
+
+        name = data['name']
+        items = data['items']
+        difficulty = data['difficulty']
+
+        if maps_collection.find_one({"name": name}):
+            return jsonify({"error": "A map with this name already exists"}), 409
+
+        map_document = {
+            "name": name,
+            "items": items,
+            "difficulty": difficulty
+        }
+
+        maps_collection.insert_one(map_document)
+        return jsonify({"message": f"Map '{name}' saved successfully"}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/maps/<string:map_name>", methods=['PUT'])
+def update_map(map_name):
+    try:
+        data = request.get_json()
+        if not data or 'items' not in data or 'difficulty' not in data:
+            return jsonify({"error": "Invalid data format, must include items and difficulty"}), 400
+
+        items = data['items']
+        difficulty = data['difficulty']
+
+        result = maps_collection.update_one(
+            {"name": map_name},
+            {"$set": {"items": items, "difficulty": difficulty}}
+        )
+
+        if result.matched_count == 0:
+            return jsonify({"error": "Map not found"}), 404
+
+        return jsonify({"message": f"Map '{map_name}' updated successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/maps/<string:map_name>", methods=['DELETE'])
+def delete_map(map_name):
+    try:
+        result = maps_collection.delete_one({"name": map_name})
+        if result.deleted_count == 0:
+            return jsonify({"error": "Map not found"}), 404
+        
+        return jsonify({"message": f"Map '{map_name}' deleted successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/stats", methods=['GET'])
+def get_stats():
+    try:
+        total_maps = maps_collection.count_documents({})
+        
+        pipeline = [
+            {
+                "$group": {
+                    "_id": "$difficulty",
+                    "count": {"$sum": 1}
+                }
+            }
+        ]
+        difficulty_results = list(maps_collection.aggregate(pipeline))
+        
+        difficulty_counts = {item['_id']: item['count'] for item in difficulty_results}
+
+        # Ensure all difficulty levels are present in the response
+        for key in ["EASY", "MEDIUM", "HARD", "VERY_HARD"]:
+            if key not in difficulty_counts:
+                difficulty_counts[key] = 0
+
+        stats = {
+            "total_maps": total_maps,
+            "difficulty_counts": difficulty_counts
+        }
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# main.py
 # Ez a fájl a szöveges felhasználói felületet és a vezérlést tartalmazza
 
 # from database.db_save import SaveMap
@@ -110,3 +220,6 @@ if __name__ == "__main__":
 
 # if __name__ == "__main__":
 #     main()
+
+if __name__ == "__main__":
+    app.run(debug=True, port=8000)
