@@ -4,7 +4,6 @@ from db_handler_abst import DBHandlerAbstract
 
 
 
-
 # --- Factory method pattern ---
 
 class DbLoad(DBHandlerAbstract):
