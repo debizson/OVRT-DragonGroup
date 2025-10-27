@@ -1,6 +1,6 @@
-from db_config import db
-from saver import RealDataSaver, EmptyDataSaver
-from db_handler_abst import DBHandlerAbstract
+from .db_config import db
+from .saver import RealDataSaver, EmptyDataSaver
+from .db_handler_abst import DBHandlerAbstract
 
 
 
@@ -53,7 +53,7 @@ class DocumentDeleter:
     def delete_by_name(self, nev: str) -> bool:
         try:
             collection = db["maps"]
-            eredmeny = collection.delete_many({"name": nev})  # 🔧 Törlés név alapján
+            eredmeny = collection.delete_many({"name": nev})  # Törlés név alapján
             print(f"{eredmeny.deleted_count} dokumentum törölve a 'maps' kollekcióból.")
             return eredmeny.deleted_count > 0
         except Exception as e:
@@ -70,7 +70,7 @@ class AllDocumentsFetcher:
     def fetch_all(self) -> list[dict]:
         try:
             collection = db["maps"]
-            dokumentumok = list(collection.find({}, {"_id": 0}))  # 🔍 Minden dokumentum, _id nélkül
+            dokumentumok = list(collection.find({}, {"_id": 0}))  # Minden dokumentum, _id nélkül
             return dokumentumok
         except Exception as e:
             print(f"Hiba a dokumentumok lekérése során: {e}")
@@ -83,7 +83,7 @@ class AllDocumentsFetcher:
 
 
 # document = {
-#      "name": "default_map8",  # ✅ HOZZÁADVA: alapértelmezett név mező
+#      "name": "default_map",  # ✅ HOZZÁADVA: alapértelmezett név mező
 #      "gridSize": {
 #          "width": 30,
 #          "height": 20
@@ -121,12 +121,12 @@ class AllDocumentsFetcher:
 # controller.run([document])
 
 # loader = DbLoad()
-# document= loader.run("default_map8")
+# document= loader.run("default_map")
 
 # print(document)
 
 # deleter = DocumentDeleter()
-# deleter.delete_by_name("default_map8")
+# deleter.delete_by_name("default_map")
 
 # fetcher = AllDocumentsFetcher()
 # osszes = fetcher.fetch_all()

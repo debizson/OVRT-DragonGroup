@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from app.db.db import db, DbLoad
-from app.analysis.difficulty import DifficultyCalculator
+from app.db.db import db, DbLoad, AllDocumentsFetcher
+from app.analysis.difficulty import Difficulty
 
 app = Flask(__name__)
 CORS(app)
@@ -15,10 +15,9 @@ def health():
 @app.route("/api/maps", methods=['GET'])
 def get_maps():
     try:
-        print("API endpoint /api/maps hit. Fetching map list using DbLoad...")
-        loader = DbLoad()
-        # DbLoad fetches full documents, so we manually process them into a summary
-        full_maps_data = loader.run("maps")
+        print("API endpoint /api/maps hit. Fetching all maps...")
+        fetcher = AllDocumentsFetcher()
+        full_maps_data = fetcher.fetch_all()
         
         maps_summary = [
             {"name": doc.get("name"), "difficulty": doc.get("difficulty")}

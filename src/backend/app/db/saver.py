@@ -1,5 +1,5 @@
-from db_config import db
-from db_handler_abst import DBHandlerAbstract
+from .db_config import db
+from .db_handler_abst import DBHandlerAbstract
 
 
 
