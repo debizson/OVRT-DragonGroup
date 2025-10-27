@@ -83,7 +83,7 @@ class AllDocumentsFetcher:
 
 
 # document = {
-#      "name": "default_map7",  # ✅ HOZZÁADVA: alapértelmezett név mező
+#      "name": "default_map",  # ✅ HOZZÁADVA: alapértelmezett név mező
 #      "gridSize": {
 #          "width": 30,
 #          "height": 20
