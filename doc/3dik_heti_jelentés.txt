@@ -1,0 +1,8 @@
+A csapat nagyon intenzíven szinte naponta dolgozott össze több órán át minden nap. A kapcsolat színtere Discord.
+Nagyon jól haladtunk, nagyon nagy technológiai hátterű projektet vállaltunk és derekasan helyt
+állunk. A web alapú megjelenítés, a komplex üzleti logika és a felhő alapú adatbázis tárolás terhét jól viseli a csapat.
+
+	Elkészültünk a projekt használható prototípusával. Minden alapfunkciót megvalósítottunk és számos extra funkció, mint pl. nehézség fok szerinti térkép generálás, több statisztika, felhő tárhely használata, nyomtatás stb. A rétegek közti kommunikáció részben működik.
+	A fronted funkcionalitása nagyon részletesre és látványosra sikerült. 
+
+	
