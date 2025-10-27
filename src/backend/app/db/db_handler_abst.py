@@ -1,5 +1,8 @@
 from abc import ABC, abstractmethod
 
+
+# Factory method pattern
+
 class DBHandlerAbstract(ABC):
     def __init__(self, forras_nev: str):
         self.forras_nev = forras_nev
