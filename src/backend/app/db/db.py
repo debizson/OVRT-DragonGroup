@@ -1,43 +1,11 @@
-from pymongo import MongoClient
-import os
-from dotenv import load_dotenv
-from abc import ABC, abstractmethod
+from db_config import db
+from saver import RealDataSaver, EmptyDataSaver
+from db_handler_abst import DBHandlerAbstract
 
 
 
-
-
-
-load_dotenv()
-
-MONGODB_URI = os.getenv("MONGODB_URI")
-MONGODB_DB = os.getenv("MONGODB_DB", "dnd_dev")
-
-client = MongoClient(MONGODB_URI)
-db = client[MONGODB_DB]
-
-print(f"Connected to MongoDB database: {MONGODB_DB}")
-
-
-
-
-
-
-# Feltételezzük, hogy a MongoDB kapcsolat már létrejött és a 'db' objektum elérhető
 
 # --- Factory method pattern ---
-
-class DBHandlerAbstract(ABC):
-    def __init__(self, forras_nev: str):
-        self.forras_nev = forras_nev
-
-    def logolas(self, muvelet: str):
-        print(f"{muvelet} művelet a(z) {self.forras_nev} forráson.")
-
-    @abstractmethod
-    def run(self, *args, **kwargs):
-        pass
-
 
 class DbLoad(DBHandlerAbstract):
     def __init__(self):
@@ -78,58 +46,6 @@ class SaveController:
         return mento.run(dokumentumok)
 
 
-class EmptyDataSaver(DBHandlerAbstract):
-    def __init__(self):
-        super().__init__("ures_mento")
-
-    def run(self, dokumentumok: list[dict]) -> bool:
-        self.logolas("Üres mentés a 'maps' kollekcióba")
-        try:
-            collection = db["maps"]
-
-            alap_dokumentum = {
-                "name": "default_map",  # ✅ HOZZÁADVA: alapértelmezett név mező
-                "gridSize": {
-                    "width": 30,
-                    "height": 20
-                },
-                "zoom": 1,
-                "cells": [
-                    {
-                        "x": 1,
-                        "y": 1,
-                        "type": "wall",
-                        "color": "#66265f",
-                        "icon": ""
-                    }
-                ],
-                "timestamp": "2025-10-25T13:25:51.522Z",
-                "cellCount": 1
-            }
-
-            collection.insert_one(alap_dokumentum)
-            return True
-        except Exception as e:
-            print(f"Hiba az alapértelmezett mentés során: {e}")
-            return False
-
-
-class RealDataSaver(DBHandlerAbstract):
-    def __init__(self):
-        super().__init__("valos_mento")
-
-    def run(self, dokumentumok: list[dict]) -> bool:
-        self.logolas("Valós mentés a 'maps' kollekcióba")
-        try:
-            collection = db["maps"]
-            for dokumentum in dokumentumok:
-                collection.insert_one(dokumentum)  # ✅ MÓDOSÍTÁS: dokumentum mentése módosítás nélkül
-            return True
-        except Exception as e:
-            print(f"Hiba a mentés során: {e}")
-            return False
-
-
         
 class DocumentDeleter:
     def __init__(self):
@@ -144,6 +60,9 @@ class DocumentDeleter:
         except Exception as e:
             print(f"Hiba a törlés során: {e}")
             return False  
+        
+
+
 
 class AllDocumentsFetcher:
     def __init__(self):
@@ -165,7 +84,7 @@ class AllDocumentsFetcher:
 
 
 # document = {
-#      "name": "default_map4",  # ✅ HOZZÁADVA: alapértelmezett név mező
+#      "name": "default_map7",  # ✅ HOZZÁADVA: alapértelmezett név mező
 #      "gridSize": {
 #          "width": 30,
 #          "height": 20
