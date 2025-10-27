@@ -83,7 +83,7 @@ class AllDocumentsFetcher:
 
 
 # document = {
-#      "name": "default_map",  # ✅ HOZZÁADVA: alapértelmezett név mező
+#      "name": "default_map8",  # ✅ HOZZÁADVA: alapértelmezett név mező
 #      "gridSize": {
 #          "width": 30,
 #          "height": 20
@@ -121,12 +121,12 @@ class AllDocumentsFetcher:
 # controller.run([document])
 
 # loader = DbLoad()
-# document= loader.run("default_map")
+# document= loader.run("default_map8")
 
 # print(document)
 
 # deleter = DocumentDeleter()
-# deleter.delete_by_name("default_map")
+# deleter.delete_by_name("default_map8")
 
 # fetcher = AllDocumentsFetcher()
 # osszes = fetcher.fetch_all()
