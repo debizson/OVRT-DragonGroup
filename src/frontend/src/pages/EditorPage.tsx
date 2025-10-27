@@ -23,11 +23,15 @@ export default function EditorPage() {
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDimensionDialog, setShowDimensionDialog] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [generatedDifficulty, setGeneratedDifficulty] = useState<'easy' | 'medium' | 'hard' | 'very-hard' | null>(null);
+  const [loadedMapName, setLoadedMapName] = useState<string | null>(null);
+  const [isLoadingMap, setIsLoadingMap] = useState(false);
   
   const history = useRef<Map<string, CellData>[]>([new Map()]);
   const historyIndex = useRef(0);
   const lastGeneratedDifficulty = useRef<string | null>(null);
+  const hasLoadedMap = useRef(false);
 
   const handleZoomIn = () => setZoom(Math.min(zoom + 0.1, 2));
   const handleZoomOut = () => setZoom(Math.max(zoom - 0.1, 0.5));
@@ -133,11 +137,78 @@ export default function EditorPage() {
     }
   }, [location.state, updateCellsWithHistory]);
 
+  useEffect(() => {
+    const loadMapName = searchParams.get('loadMap');
+    
+    if (loadMapName && !hasLoadedMap.current) {
+      const loadMapFromAPI = async () => {
+        setIsLoadingMap(true);
+        hasLoadedMap.current = true;
+        
+        try {
+          console.log(`Loading map from API: ${loadMapName}`);
+          const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/maps/${encodeURIComponent(loadMapName)}`;
+          const response = await fetch(apiUrl);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const mapData = await response.json();
+          console.log('Map data loaded:', mapData);
+          
+          setLoadedMapName(mapData.name);
+          
+          if (mapData.gridSize) {
+            setGridSize(mapData.gridSize);
+          }
+          
+          if (mapData.zoom) {
+            setZoom(mapData.zoom);
+          }
+          
+          if (mapData.cells && Array.isArray(mapData.cells)) {
+            const newCells = new Map<string, CellData>();
+            mapData.cells.forEach((cell: any) => {
+              const key = `${cell.x},${cell.y}`;
+              newCells.set(key, {
+                type: cell.type,
+                color: cell.color,
+                icon: cell.icon || ''
+              });
+            });
+            updateCellsWithHistory(newCells);
+            console.log(`Map '${loadMapName}' loaded successfully with ${newCells.size} cells`);
+          }
+        } catch (error) {
+          console.error('Failed to load map from API:', error);
+          alert(`Failed to load map '${loadMapName}'. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          hasLoadedMap.current = false;
+        } finally {
+          setIsLoadingMap(false);
+        }
+      };
+      
+      loadMapFromAPI();
+    }
+  }, [searchParams, updateCellsWithHistory]);
+
   const canUndo = historyIndex.current > 0;
   const canRedo = historyIndex.current < history.current.length - 1;
 
   const handleSave = () => {
+    // If no loaded map name, show dialog to get name first
+    if (!loadedMapName) {
+      setShowSaveDialog(true);
+    } else {
+      // If there is a name, save directly
+      saveMapToBackend(loadedMapName);
+    }
+  };
+
+  const saveMapToBackend = async (mapName: string) => {
     const mapData = {
+      name: mapName,
       gridSize,
       zoom,
       cells: Array.from(cells.entries()).map(([key, value]) => {
@@ -152,20 +223,53 @@ export default function EditorPage() {
       cellCount: cells.size
     };
     
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    const fileName = `dnd-map-${timestamp}`;
-    
-    const jsonString = JSON.stringify(mapData, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${fileName}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-    
-    console.log('Térkép mentve:', fileName);
-    console.log('Összesen cellák:', cells.size);
+    try {
+      // if we have a loaded map name, update it, otherwise, create new
+      const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/maps${loadedMapName ? `/${encodeURIComponent(loadedMapName)}` : ''}`;
+      const method = loadedMapName ? 'PUT' : 'POST';
+      
+      console.log(`Saving map to ${apiUrl} using ${method}`);
+      
+      const response = await fetch(apiUrl, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(mapData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('Map saved successfully:', result);
+      alert(`Térkép sikeresen mentve: ${mapData.name}`);
+      
+      // if this was a new map, set the loaded map name
+      if (!loadedMapName) {
+        setLoadedMapName(mapData.name);
+      }
+    } catch (error) {
+      console.error('Failed to save map:', error);
+      alert(`Hiba történt a térkép mentése közben: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // file download fallback
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const fileName = `dnd-map-${timestamp}`;
+      
+      const jsonString = JSON.stringify(mapData, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${fileName}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      
+      console.log('Map saved as file instead:', fileName);
+    }
   };
 
   const handleExport = (fileName: string, format: 'png' | 'pdf' | 'json') => {
@@ -233,6 +337,17 @@ export default function EditorPage() {
 
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col bg-gray-100">
+      {isLoadingMap && (
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-8">
+            <div className="flex flex-col items-center space-y-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+              <p className="text-lg text-gray-700">Térkép betöltése...</p>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <button onClick={handleSave} className="btn-secondary flex items-center space-x-2">
@@ -366,6 +481,17 @@ export default function EditorPage() {
           onUpdate={handleUpdateDimensions}
         />
       )}
+
+      {showSaveDialog && (
+        <SaveMapDialog
+          onClose={() => setShowSaveDialog(false)}
+          onSave={(name) => {
+            setShowSaveDialog(false);
+            setLoadedMapName(name);
+            saveMapToBackend(name);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -453,6 +579,90 @@ function DimensionDialog({ currentWidth, currentHeight, onClose, onUpdate }: Dim
               className="flex-1 px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
             >
               Alkalmazás
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface SaveMapDialogProps {
+  onClose: () => void;
+  onSave: (name: string) => void;
+}
+
+function SaveMapDialog({ onClose, onSave }: SaveMapDialogProps) {
+  const [mapName, setMapName] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = () => {
+    if (!mapName.trim()) {
+      setError('A térkép nevét meg kell adni!');
+      return;
+    }
+    
+    if (mapName.length < 3) {
+      setError('A térkép nevének legalább 3 karakter hosszúnak kell lennie!');
+      return;
+    }
+    
+    onSave(mapName.trim());
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+        <div className="p-6">
+          <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-purple-100 rounded-full">
+            <Save className="w-6 h-6 text-purple-600" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+            Térkép mentése
+          </h3>
+          <p className="text-sm text-gray-600 text-center mb-6">
+            Add meg a térkép nevét
+          </p>
+
+          <div className="mb-6">
+            <label htmlFor="mapName" className="block text-sm font-medium text-gray-700 mb-2">
+              Térkép neve
+            </label>
+            <input
+              id="mapName"
+              type="text"
+              value={mapName}
+              onChange={(e) => {
+                setMapName(e.target.value);
+                setError('');
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSubmit();
+                }
+              }}
+              placeholder="pl.: Kaland Térkép 1"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              autoFocus
+            />
+            {error && (
+              <p className="mt-2 text-sm text-red-600">{error}</p>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            >
+              Mégse
+            </button>
+            <button
+              onClick={handleSubmit}
+              className="flex-1 px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors flex items-center justify-center gap-2"
+            >
+              <Save className="w-4 h-4" />
+              Mentés
             </button>
           </div>
         </div>
